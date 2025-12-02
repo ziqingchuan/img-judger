@@ -1,0 +1,350 @@
+import { useState, useRef, memo, useCallback } from 'react';
+import './App.css';
+import { parseExcelFile, ImageUrlItem } from './services/excelParser';
+import { cozeGenTotal } from './services/cozeApi';
+
+interface ProcessResult {
+  url: string;
+  rowIndex: number;
+  columnName: string;
+  status: 'pending' | 'processing' | 'success' | 'error';
+  result?: any;
+  error?: string;
+}
+
+// 优化：使用memo避免不必要的重渲染
+const ResultItem = memo(({ result, index }: { result: ProcessResult; index: number }) => {
+  return (
+    <div className={`result-item ${result.status}`}>
+      <div className="result-header">
+        <div className="result-info">
+          <div className="result-index">
+            #{index + 1} - 第{result.rowIndex}行 - {result.columnName}
+          </div>
+          <div className="result-url">{result.url}</div>
+        </div>
+        <div className={`result-status ${result.status}`}>
+          {result.status === 'pending' && '等待中'}
+          {result.status === 'processing' && (
+            <>
+              <span className="spinner"></span>
+              处理中
+            </>
+          )}
+          {result.status === 'success' && '✓ 成功'}
+          {result.status === 'error' && '✗ 失败'}
+        </div>
+      </div>
+      
+      {result.status === 'success' && result.result && (
+        <div className="result-content">
+          {typeof result.result === 'object' && result.result.lijie
+            ? result.result.lijie
+            : (typeof result.result === 'string' ? result.result : JSON.stringify(result.result, null, 2))}
+        </div>
+      )}
+      
+      {result.status === 'error' && result.error && (
+        <div className="result-content result-error">
+          错误: {result.error}
+        </div>
+      )}
+    </div>
+  );
+});
+
+ResultItem.displayName = 'ResultItem';
+
+function App() {
+  const [file, setFile] = useState<File | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
+  const [results, setResults] = useState<ProcessResult[]>([]);
+  const [isProcessing, setIsProcessing] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  
+  // 优化：使用ref避免状态更新导致的重渲染
+  const shouldStopRef = useRef(false);
+  const resultsRef = useRef<ProcessResult[]>([]);
+
+  const handleFileSelect = (selectedFile: File) => {
+    if (selectedFile && selectedFile.name.match(/\.(xlsx|xls)$/i)) {
+      setFile(selectedFile);
+      setResults([]);
+    } else {
+      alert('请选择有效的Excel文件（.xlsx 或 .xls）');
+    }
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = () => {
+    setIsDragging(false);
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+    const droppedFile = e.dataTransfer.files[0];
+    if (droppedFile) {
+      handleFileSelect(droppedFile);
+    }
+  };
+
+  const handleFileInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const selectedFile = e.target.files?.[0];
+    if (selectedFile) {
+      handleFileSelect(selectedFile);
+    }
+  };
+
+  const processImages = useCallback(async (continueFromPending = false) => {
+    if (!file) return;
+
+    setIsProcessing(true);
+    shouldStopRef.current = false;
+    
+    try {
+      let imageUrls: ImageUrlItem[];
+      let startIndex = 0;
+
+      if (continueFromPending && resultsRef.current.length > 0) {
+        // 继续处理：从第一个未处理的项开始
+        imageUrls = resultsRef.current.map(r => ({
+          url: r.url,
+          rowIndex: r.rowIndex,
+          columnName: r.columnName
+        }));
+        startIndex = resultsRef.current.findIndex(r => r.status === 'pending');
+        if (startIndex === -1) {
+          alert('没有待处理的项目');
+          setIsProcessing(false);
+          return;
+        }
+      } else {
+        // 首次处理：解析Excel文件
+        imageUrls = await parseExcelFile(file);
+        
+        if (imageUrls.length === 0) {
+          alert('未在Excel中找到包含"截图链接"字样的列或该列没有数据');
+          setIsProcessing(false);
+          return;
+        }
+
+        const initialResults: ProcessResult[] = imageUrls.map(item => ({
+          ...item,
+          status: 'pending'
+        }));
+        
+        resultsRef.current = initialResults;
+        setResults([...initialResults]);
+      }
+
+      // 优化：批量更新，减少渲染次数（每10个更新一次）
+      const BATCH_SIZE = 10;
+      let batchCount = 0;
+
+      // 顺序处理每个图片链接
+      for (let i = startIndex; i < imageUrls.length; i++) {
+        // 检查是否需要停止
+        if (shouldStopRef.current) {
+          console.log('用户终止处理');
+          // 将当前处理中的项恢复为待处理
+          resultsRef.current[i] = { ...resultsRef.current[i], status: 'pending' };
+          setResults([...resultsRef.current]);
+          break;
+        }
+
+        const item = imageUrls[i];
+        
+        // 更新状态为处理中
+        resultsRef.current[i] = { ...resultsRef.current[i], status: 'processing' };
+        batchCount++;
+        
+        // 批量更新UI
+        if (batchCount >= BATCH_SIZE) {
+          setResults([...resultsRef.current]);
+          batchCount = 0;
+        }
+
+        try {
+          const result = await cozeGenTotal(item.url);
+          
+          // 再次检查是否需要停止
+          if (shouldStopRef.current) {
+            resultsRef.current[i] = { ...resultsRef.current[i], status: 'pending' };
+            setResults([...resultsRef.current]);
+            break;
+          }
+          
+          // 更新状态为成功
+          resultsRef.current[i] = { ...resultsRef.current[i], status: 'success', result };
+        } catch (error: any) {
+          // 更新状态为失败
+          resultsRef.current[i] = { ...resultsRef.current[i], status: 'error', error: error.message };
+        }
+        
+        batchCount++;
+        
+        // 批量更新UI
+        if (batchCount >= BATCH_SIZE) {
+          setResults([...resultsRef.current]);
+          batchCount = 0;
+        }
+      }
+      
+      // 最后更新一次确保所有状态同步
+      setResults([...resultsRef.current]);
+    } catch (error: any) {
+      alert(`处理失败: ${error.message}`);
+    } finally {
+      setIsProcessing(false);
+    }
+  }, [file]);
+
+  const handleStop = useCallback(() => {
+    shouldStopRef.current = true;
+  }, []);
+
+  const handleContinue = useCallback(() => {
+    processImages(true);
+  }, [processImages]);
+
+  const stats = {
+    total: results.length,
+    success: results.filter(r => r.status === 'success').length,
+    error: results.filter(r => r.status === 'error').length,
+    processing: results.filter(r => r.status === 'processing').length,
+    pending: results.filter(r => r.status === 'pending').length,
+  };
+
+  const progress = stats.total > 0 
+    ? ((stats.success + stats.error) / stats.total) * 100 
+    : 0;
+
+  const hasPendingItems = stats.pending > 0;
+
+  return (
+    <div className="app-container">
+      <div className="app-header">
+        <h1 className="app-title">📊 Excel图片处理工具</h1>
+        <p className="app-subtitle">上传Excel文件，自动提取并处理图片链接</p>
+      </div>
+
+      <div className="main-card">
+        <div className="upload-section">
+          <div
+            className={`upload-area ${isDragging ? 'dragging' : ''}`}
+            onDragOver={handleDragOver}
+            onDragLeave={handleDragLeave}
+            onDrop={handleDrop}
+            onClick={() => fileInputRef.current?.click()}
+          >
+            <div className="upload-icon">📁</div>
+            <div className="upload-text">点击或拖拽Excel文件到此处</div>
+            <div className="upload-hint">支持 .xlsx 和 .xls 格式</div>
+            <input
+              ref={fileInputRef}
+              type="file"
+              className="file-input"
+              accept=".xlsx,.xls"
+              onChange={handleFileInputChange}
+            />
+          </div>
+
+          {file && (
+            <div className="selected-file">
+              <div className="file-info">
+                <span className="file-icon">📄</span>
+                <span className="file-name">{file.name}</span>
+              </div>
+              <div className="button-group">
+                {!isProcessing && results.length === 0 && (
+                  <button
+                    className="btn btn-primary"
+                    onClick={() => processImages(false)}
+                  >
+                    开始处理
+                  </button>
+                )}
+                {isProcessing && (
+                  <button
+                    className="btn btn-danger"
+                    onClick={handleStop}
+                  >
+                    ⏸ 终止处理
+                  </button>
+                )}
+                {!isProcessing && hasPendingItems && (
+                  <button
+                    className="btn btn-success"
+                    onClick={handleContinue}
+                  >
+                    ▶ 继续处理
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {results.length > 0 && (
+          <div className="results-section">
+            <div className="results-header">
+              <h2 className="results-title">处理结果</h2>
+              <div className="results-stats">
+                <div className="stat-item">
+                  <span className="stat-label">总计:</span>
+                  <span className="stat-value">{stats.total}</span>
+                </div>
+                <div className="stat-item">
+                  <span className="stat-label">成功:</span>
+                  <span className="stat-value success">{stats.success}</span>
+                </div>
+                <div className="stat-item">
+                  <span className="stat-label">失败:</span>
+                  <span className="stat-value error">{stats.error}</span>
+                </div>
+                {stats.processing > 0 && (
+                  <div className="stat-item">
+                    <span className="stat-label">处理中:</span>
+                    <span className="stat-value processing">{stats.processing}</span>
+                  </div>
+                )}
+                {stats.pending > 0 && (
+                  <div className="stat-item">
+                    <span className="stat-label">待处理:</span>
+                    <span className="stat-value pending">{stats.pending}</span>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {isProcessing && (
+              <div className="progress-bar">
+                <div className="progress-fill" style={{ width: `${progress}%` }} />
+              </div>
+            )}
+
+            <div className="results-list">
+              {results.map((result, index) => (
+                <ResultItem key={index} result={result} index={index} />
+              ))}
+            </div>
+          </div>
+        )}
+
+        {results.length === 0 && file && !isProcessing && (
+          <div className="empty-state">
+            <div className="empty-icon">📋</div>
+            <div className="empty-text">点击"开始处理"按钮来处理Excel中的图片链接</div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+export default App;
