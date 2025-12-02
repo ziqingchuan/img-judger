@@ -10,6 +10,8 @@ interface ProcessResult {
   status: 'pending' | 'processing' | 'success' | 'error';
   result?: any;
   error?: string;
+  correctAnswer?: number; // 0或1
+  isCorrect?: boolean; // 判断是否准确
 }
 
 // 优化：使用memo避免不必要的重渲染
@@ -38,9 +40,17 @@ const ResultItem = memo(({ result, index }: { result: ProcessResult; index: numb
       
       {result.status === 'success' && result.result && (
         <div className="result-content">
-          {typeof result.result === 'object' && result.result.lijie
-            ? result.result.lijie
-            : (typeof result.result === 'string' ? result.result : JSON.stringify(result.result, null, 2))}
+          <div>
+            {typeof result.result === 'object' && result.result.lijie
+              ? result.result.lijie
+              : (typeof result.result === 'string' ? result.result : JSON.stringify(result.result, null, 2))}
+          </div>
+          {result.correctAnswer !== undefined && (
+            <div style={{ marginTop: '8px', fontSize: '13px', color: result.isCorrect ? '#67c23a' : '#f56c6c', fontWeight: 'bold' }}>
+              {result.isCorrect ? '✓ 判断正确' : '✗ 判断错误'} 
+              (标准答案: {result.correctAnswer === 1 ? '合格' : '不合格'})
+            </div>
+          )}
         </div>
       )}
       
@@ -179,8 +189,30 @@ function App() {
             break;
           }
           
+          // 判断准确性
+          let isCorrect: boolean | undefined = undefined;
+          if (item.correctAnswer !== undefined) {
+            const resultText = typeof result === 'object' && result.lijie 
+              ? result.lijie 
+              : (typeof result === 'string' ? result : JSON.stringify(result));
+            
+            const hasQualified = resultText.includes('合格') && !resultText.includes('不合格');
+            const hasUnqualified = resultText.includes('不合格');
+            
+            // 判断逻辑：如果结果包含"合格"（且不包含"不合格"），则认为是合格
+            const predictedQualified = hasQualified && !hasUnqualified;
+            const expectedQualified = item.correctAnswer === 1;
+            
+            isCorrect = predictedQualified === expectedQualified;
+          }
+          
           // 更新状态为成功
-          resultsRef.current[i] = { ...resultsRef.current[i], status: 'success', result };
+          resultsRef.current[i] = { 
+            ...resultsRef.current[i], 
+            status: 'success', 
+            result,
+            isCorrect 
+          };
         } catch (error: any) {
           // 更新状态为失败
           resultsRef.current[i] = { ...resultsRef.current[i], status: 'error', error: error.message };
@@ -219,6 +251,17 @@ function App() {
     processing: results.filter(r => r.status === 'processing').length,
     pending: results.filter(r => r.status === 'pending').length,
   };
+
+  // 计算准确率
+  const accuracyStats = {
+    totalWithAnswer: results.filter(r => r.correctAnswer !== undefined && r.status === 'success').length,
+    correct: results.filter(r => r.isCorrect === true).length,
+    incorrect: results.filter(r => r.isCorrect === false).length,
+  };
+  
+  const accuracy = accuracyStats.totalWithAnswer > 0 
+    ? ((accuracyStats.correct / accuracyStats.totalWithAnswer) * 100).toFixed(2)
+    : '0.00';
 
   const progress = stats.total > 0 
     ? ((stats.success + stats.error) / stats.total) * 100 
@@ -321,6 +364,26 @@ function App() {
                 )}
               </div>
             </div>
+
+            {accuracyStats.totalWithAnswer > 0 && (
+              <div className="accuracy-section">
+                <div className="accuracy-card">
+                  <div className="accuracy-title">准确率统计</div>
+                  <div className="accuracy-value">{accuracy}%</div>
+                  <div className="accuracy-details">
+                    <span className="accuracy-detail-item correct">
+                      正确: {accuracyStats.correct}
+                    </span>
+                    <span className="accuracy-detail-item incorrect">
+                      错误: {accuracyStats.incorrect}
+                    </span>
+                    <span className="accuracy-detail-item total">
+                      总数: {accuracyStats.totalWithAnswer}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            )}
 
             {isProcessing && (
               <div className="progress-bar">

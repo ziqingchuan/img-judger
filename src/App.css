@@ -188,7 +188,60 @@ body {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  margin-bottom: 20px;
+}
+
+.accuracy-section {
   margin-bottom: 24px;
+}
+
+.accuracy-card {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border-radius: 12px;
+  padding: 24px;
+  text-align: center;
+  color: white;
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+}
+
+.accuracy-title {
+  font-size: 16px;
+  font-weight: 500;
+  margin-bottom: 12px;
+  opacity: 0.9;
+}
+
+.accuracy-value {
+  font-size: 48px;
+  font-weight: 700;
+  margin-bottom: 16px;
+  text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.accuracy-details {
+  display: flex;
+  justify-content: center;
+  gap: 24px;
+  font-size: 14px;
+}
+
+.accuracy-detail-item {
+  padding: 6px 16px;
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 20px;
+  font-weight: 500;
+}
+
+.accuracy-detail-item.correct {
+  background: rgba(103, 194, 58, 0.3);
+}
+
+.accuracy-detail-item.incorrect {
+  background: rgba(245, 108, 108, 0.3);
+}
+
+.accuracy-detail-item.total {
+  background: rgba(255, 255, 255, 0.2);
 }
 
 .results-title {

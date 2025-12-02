@@ -4,6 +4,7 @@ export interface ImageUrlItem {
   url: string;
   rowIndex: number;
   columnName: string;
+  correctAnswer?: number; // 0或1，1表示合格，0表示不合格
 }
 
 export const parseExcelFile = async (file: File): Promise<ImageUrlItem[]> => {
@@ -41,17 +42,30 @@ export const parseExcelFile = async (file: File): Promise<ImageUrlItem[]> => {
           return;
         }
 
+        // 查找"正确答案"列索引
+        const correctAnswerIndex = headers.findIndex(header => 
+          header && header.toString().includes('正确答案')
+        );
+
         // 提取图片链接
         for (let i = 1; i < jsonData.length; i++) {
           const row = jsonData[i];
           imageColumnIndices.forEach(colIndex => {
             const cellValue = row[colIndex];
             if (cellValue && typeof cellValue === 'string' && cellValue.trim()) {
-              imageUrls.push({
+              const item: ImageUrlItem = {
                 url: cellValue.trim(),
                 rowIndex: i + 1,
                 columnName: headers[colIndex]
-              });
+              };
+              
+              // 如果找到正确答案列，读取该值
+              if (correctAnswerIndex !== -1 && row[correctAnswerIndex] !== undefined) {
+                const answerValue = row[correctAnswerIndex];
+                item.correctAnswer = Number(answerValue);
+              }
+              
+              imageUrls.push(item);
             }
           });
         }
