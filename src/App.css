@@ -294,6 +294,7 @@ body {
   max-height: 600px;
   overflow-y: auto;
   padding-right: 8px;
+  margin-top: 20px;
 }
 
 .results-list::-webkit-scrollbar {
@@ -452,4 +453,330 @@ body {
   background: linear-gradient(90deg, #409eff, #66b1ff);
   transition: width 0.3s ease;
   border-radius: 8px;
+}
+
+/* 移动端适配 */
+@media (max-width: 768px) {
+  .app-container {
+    padding: 20px 12px;
+  }
+
+  .app-header {
+    margin-bottom: 24px;
+  }
+
+  .app-title {
+    font-size: 24px;
+  }
+
+  .app-subtitle {
+    font-size: 13px;
+  }
+
+  .main-card {
+    border-radius: 8px;
+  }
+
+  .upload-section {
+    padding: 20px;
+  }
+
+  .upload-area {
+    padding: 40px 20px;
+    border-radius: 8px;
+  }
+
+  .upload-icon {
+    font-size: 48px;
+  }
+
+  .upload-text {
+    font-size: 15px;
+  }
+
+  .upload-hint {
+    font-size: 12px;
+  }
+
+  .selected-file {
+    flex-direction: column;
+    gap: 12px;
+    align-items: stretch;
+  }
+
+  .file-info {
+    gap: 8px;
+  }
+
+  .file-name {
+    font-size: 13px;
+    word-break: break-all;
+  }
+
+  .button-group {
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .btn {
+    padding: 10px 20px;
+    font-size: 14px;
+    width: 100%;
+    justify-content: center;
+  }
+
+  .results-section {
+    padding: 20px;
+  }
+
+  .results-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+    margin-bottom: 16px;
+  }
+
+  .results-title {
+    font-size: 18px;
+  }
+
+  .results-stats {
+    flex-wrap: wrap;
+    gap: 12px;
+    font-size: 12px;
+    width: 100%;
+  }
+
+  .stat-item {
+    gap: 4px;
+  }
+
+  .accuracy-section {
+    margin-bottom: 16px;
+  }
+
+  .accuracy-card {
+    padding: 20px 16px;
+    border-radius: 8px;
+  }
+
+  .accuracy-title {
+    font-size: 13px;
+  }
+
+  .accuracy-value {
+    font-size: 36px;
+    margin-bottom: 12px;
+  }
+
+  .accuracy-details {
+    flex-direction: column;
+    gap: 8px;
+    font-size: 12px;
+  }
+
+  .accuracy-detail-item {
+    padding: 6px 12px;
+  }
+
+  .results-list {
+    gap: 12px;
+    max-height: 500px;
+    padding-right: 4px;
+  }
+
+  .result-item {
+    padding: 14px;
+    border-radius: 8px;
+  }
+
+  .result-header {
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .result-index {
+    font-size: 12px;
+  }
+
+  .result-url {
+    font-size: 12px;
+    line-height: 1.5;
+  }
+
+  .result-status {
+    align-self: flex-start;
+    padding: 4px 12px;
+    font-size: 12px;
+    gap: 6px;
+  }
+
+  .result-content {
+    padding: 12px;
+    font-size: 13px;
+    line-height: 1.6;
+    border-radius: 6px;
+  }
+
+  .empty-state {
+    padding: 40px 16px;
+  }
+
+  .empty-icon {
+    font-size: 48px;
+  }
+
+  .empty-text {
+    font-size: 14px;
+  }
+
+  .progress-bar {
+    margin-top: 16px;
+    height: 6px;
+  }
+}
+
+/* 小屏手机适配 (320px - 480px) */
+@media (max-width: 480px) {
+  .app-container {
+    padding: 16px 8px;
+  }
+
+  .app-title {
+    font-size: 20px;
+  }
+
+  .app-subtitle {
+    font-size: 12px;
+  }
+
+  .upload-section {
+    padding: 16px;
+  }
+
+  .upload-area {
+    padding: 30px 16px;
+  }
+
+  .upload-icon {
+    font-size: 40px;
+    margin-bottom: 12px;
+  }
+
+  .upload-text {
+    font-size: 14px;
+  }
+
+  .upload-hint {
+    font-size: 11px;
+  }
+
+  .selected-file {
+    padding: 12px;
+  }
+
+  .file-name {
+    font-size: 12px;
+  }
+
+  .btn {
+    padding: 9px 16px;
+    font-size: 13px;
+  }
+
+  .results-section {
+    padding: 16px;
+  }
+
+  .results-title {
+    font-size: 16px;
+  }
+
+  .results-stats {
+    gap: 8px;
+    font-size: 11px;
+  }
+
+  .accuracy-card {
+    padding: 16px 12px;
+  }
+
+  .accuracy-title {
+    font-size: 12px;
+    margin-bottom: 8px;
+  }
+
+  .accuracy-value {
+    font-size: 32px;
+    margin-bottom: 10px;
+  }
+
+  .accuracy-details {
+    gap: 6px;
+    font-size: 11px;
+  }
+
+  .accuracy-detail-item {
+    padding: 5px 10px;
+  }
+
+  .results-list {
+    gap: 10px;
+    max-height: 400px;
+  }
+
+  .result-item {
+    padding: 12px;
+  }
+
+  .result-index {
+    font-size: 11px;
+  }
+
+  .result-url {
+    font-size: 11px;
+  }
+
+  .result-status {
+    padding: 3px 10px;
+    font-size: 11px;
+    gap: 4px;
+  }
+
+  .result-content {
+    padding: 10px;
+    font-size: 12px;
+  }
+
+  .spinner {
+    width: 12px;
+    height: 12px;
+  }
+}
+
+/* 平板适配 (768px - 1024px) */
+@media (min-width: 769px) and (max-width: 1024px) {
+  .app-container {
+    padding: 32px 24px;
+  }
+
+  .main-card {
+    max-width: 900px;
+  }
+
+  .upload-section {
+    padding: 32px;
+  }
+
+  .results-section {
+    padding: 32px;
+  }
+
+  .results-stats {
+    gap: 20px;
+  }
+
+  .accuracy-value {
+    font-size: 42px;
+  }
 }

@@ -125,7 +125,8 @@ function App() {
         imageUrls = resultsRef.current.map(r => ({
           url: r.url,
           rowIndex: r.rowIndex,
-          columnName: r.columnName
+          columnName: r.columnName,
+          correctAnswer: r.correctAnswer // 重要：保留正确答案字段
         }));
         startIndex = resultsRef.current.findIndex(r => r.status === 'pending');
         if (startIndex === -1) {
