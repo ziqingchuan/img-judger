@@ -81,10 +81,27 @@ function App() {
     if (selectedFile && selectedFile.name.match(/\.(xlsx|xls)$/i)) {
       setFile(selectedFile);
       setResults([]);
+      resultsRef.current = [];
+      setFilter('all');
     } else {
       alert('请选择有效的Excel文件（.xlsx 或 .xls）');
     }
   };
+
+  const handleReupload = useCallback(() => {
+    if (isProcessing) return; // 处理中禁用，不执行任何操作
+    fileInputRef.current?.click();
+  }, [isProcessing]);
+
+  const handleRestart = useCallback(() => {
+    if (isProcessing) return; // 处理中禁用，不执行任何操作
+    
+    if (window.confirm('确定要重新开始吗？当前所有处理结果将被清空。')) {
+      setResults([]);
+      resultsRef.current = [];
+      setFilter('all');
+    }
+  }, [isProcessing]);
 
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
@@ -346,7 +363,40 @@ function App() {
         {results.length > 0 && (
           <div className="results-section">
             <div className="results-header">
-              <h2 className="results-title">处理结果</h2>
+              <div className="results-header-left">
+                <h2 className="results-title">处理结果</h2>
+              </div>
+              <div className="results-header-right">
+                <button 
+                  className="btn btn-secondary btn-icon"
+                  onClick={handleReupload}
+                  disabled={isProcessing}
+                  title="重新上传文件"
+                >
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M21 15V19C21 19.5304 20.7893 20.0391 20.4142 20.4142C20.0391 20.7893 19.5304 21 19 21H5C4.46957 21 3.96086 20.7893 3.58579 20.4142C3.21071 20.0391 3 19.5304 3 19V15" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                    <path d="M17 8L12 3L7 8" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                    <path d="M12 3V15" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                  </svg>
+                  <span className="btn-text">重新上传</span>
+                </button>
+                <button 
+                  className="btn btn-secondary btn-icon"
+                  onClick={handleRestart}
+                  disabled={isProcessing}
+                  title="重新开始处理"
+                >
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M1 4V10H7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                    <path d="M23 20V14H17" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                    <path d="M20.49 9C19.9828 7.56678 19.1209 6.28536 17.9845 5.27542C16.8482 4.26548 15.4745 3.55976 13.9917 3.22426C12.5089 2.88875 10.9652 2.93434 9.50481 3.35677C8.04437 3.77921 6.71475 4.56471 5.64 5.64L1 10M23 14L18.36 18.36C17.2853 19.4353 15.9556 20.2208 14.4952 20.6432C13.0348 21.0657 11.4911 21.1112 10.0083 20.7757C8.52547 20.4402 7.1518 19.7345 6.01547 18.7246C4.87913 17.7146 4.01717 16.4332 3.51 15" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                  </svg>
+                  <span className="btn-text">重新开始</span>
+                </button>
+              </div>
+            </div>
+            
+            <div className="results-stats-row">
               <div className="results-stats">
                 <div 
                   className={`stat-item clickable ${filter === 'all' ? 'active' : ''}`}
