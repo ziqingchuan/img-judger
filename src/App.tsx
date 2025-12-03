@@ -15,9 +15,9 @@ interface ProcessResult {
 }
 
 // 优化：使用memo避免不必要的重渲染
-const ResultItem = memo(({ result, index }: { result: ProcessResult; index: number }) => {
+const ResultItem = memo(({ result, index, onImageClick }: { result: ProcessResult; index: number; onImageClick: (url: string) => void }) => {
   return (
-    <div className={`result-item ${result.status}`}>
+    <div className={`result-item ${result.status}`} onClick={() => onImageClick(result.url)}>
       <div className="result-header">
         <div className="result-info">
           <div className="result-index">
@@ -70,7 +70,9 @@ function App() {
   const [isDragging, setIsDragging] = useState(false);
   const [results, setResults] = useState<ProcessResult[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [isStopping, setIsStopping] = useState(false);
   const [filter, setFilter] = useState<'all' | 'success' | 'error' | 'pending' | 'processing' | 'correct' | 'incorrect'>('all');
+  const [previewImageUrl, setPreviewImageUrl] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   
   // 优化：使用ref避免状态更新导致的重渲染
@@ -252,12 +254,22 @@ function App() {
       alert(`处理失败: ${error.message}`);
     } finally {
       setIsProcessing(false);
+      setIsStopping(false);
     }
   }, [file]);
 
   const handleStop = useCallback(() => {
+    setIsStopping(true);
     shouldStopRef.current = true;
-  }, []);
+    
+    // 监听处理状态变化，当停止后隐藏加载提示
+    const checkStopped = setInterval(() => {
+      if (!shouldStopRef.current || !isProcessing) {
+        setIsStopping(false);
+        clearInterval(checkStopped);
+      }
+    }, 100);
+  }, [isProcessing]);
 
   const handleContinue = useCallback(() => {
     processImages(true);
@@ -358,7 +370,7 @@ function App() {
                     className="btn btn-danger"
                     onClick={handleStop}
                   >
-                    ⏸ 终止处理
+                    ⏸ 暂停处理
                   </button>
                 )}
                 {!isProcessing && hasPendingItems && (
@@ -513,7 +525,12 @@ function App() {
             <div className="results-list">
               {filteredResults.length > 0 ? (
                 filteredResults.map((result, index) => (
-                  <ResultItem key={index} result={result} index={results.indexOf(result)} />
+                  <ResultItem 
+                    key={index} 
+                    result={result} 
+                    index={results.indexOf(result)} 
+                    onImageClick={setPreviewImageUrl}
+                  />
                 ))
               ) : (
                 <div className="empty-filter">
@@ -534,6 +551,51 @@ function App() {
           <div className="empty-state">
             <div className="empty-icon">📋</div>
             <div className="empty-text">点击"开始处理"按钮来处理Excel中的图片链接</div>
+          </div>
+        )}
+
+        {previewImageUrl && (
+          <div className="image-preview-modal" onClick={() => setPreviewImageUrl(null)}>
+            <div className="image-preview-content" onClick={(e) => e.stopPropagation()}>
+              <button className="image-preview-close" onClick={() => setPreviewImageUrl(null)}>
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M18 6L6 18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                  <path d="M6 6L18 18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+              </button>
+              <img 
+                src={previewImageUrl} 
+                alt="预览图片" 
+                className="image-preview-img"
+                onError={(e) => {
+                  const imgElement = e.currentTarget as HTMLImageElement;
+                  const errorDiv = imgElement.nextElementSibling as HTMLDivElement;
+                  imgElement.style.display = 'none';
+                  if (errorDiv) {
+                    errorDiv.style.display = 'block';
+                  }
+                }}
+              />
+              <div className="image-preview-error" style={{ display: 'none' }}>
+                <svg width="64" height="64" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <circle cx="12" cy="12" r="10" stroke="#f56c6c" strokeWidth="2"/>
+                  <path d="M12 8V12" stroke="#f56c6c" strokeWidth="2" strokeLinecap="round"/>
+                  <circle cx="12" cy="16" r="1" fill="#f56c6c"/>
+                </svg>
+                <p>图片加载失败</p>
+                <p className="image-preview-url">{previewImageUrl}</p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {isStopping && (
+          <div className="stopping-overlay">
+            <div className="stopping-content">
+              <div className="stopping-spinner"></div>
+              <div className="stopping-text">正在暂停处理...</div>
+              <div className="stopping-hint">请稍等片刻</div>
+            </div>
           </div>
         )}
       </div>
