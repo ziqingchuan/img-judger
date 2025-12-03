@@ -70,6 +70,7 @@ function App() {
   const [isDragging, setIsDragging] = useState(false);
   const [results, setResults] = useState<ProcessResult[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [filter, setFilter] = useState<'all' | 'success' | 'error' | 'pending' | 'processing' | 'correct' | 'incorrect'>('all');
   const fileInputRef = useRef<HTMLInputElement>(null);
   
   // 优化：使用ref避免状态更新导致的重渲染
@@ -270,6 +271,14 @@ function App() {
 
   const hasPendingItems = stats.pending > 0;
 
+  // 过滤结果
+  const filteredResults = results.filter(result => {
+    if (filter === 'all') return true;
+    if (filter === 'correct') return result.isCorrect === true;
+    if (filter === 'incorrect') return result.isCorrect === false;
+    return result.status === filter;
+  });
+
   return (
     <div className="app-container">
       <div className="app-header">
@@ -339,26 +348,41 @@ function App() {
             <div className="results-header">
               <h2 className="results-title">处理结果</h2>
               <div className="results-stats">
-                <div className="stat-item">
+                <div 
+                  className={`stat-item clickable ${filter === 'all' ? 'active' : ''}`}
+                  onClick={() => setFilter('all')}
+                >
                   <span className="stat-label">总计:</span>
                   <span className="stat-value">{stats.total}</span>
                 </div>
-                <div className="stat-item">
+                <div 
+                  className={`stat-item clickable ${filter === 'success' ? 'active' : ''}`}
+                  onClick={() => setFilter('success')}
+                >
                   <span className="stat-label">成功:</span>
                   <span className="stat-value success">{stats.success}</span>
                 </div>
-                <div className="stat-item">
+                <div 
+                  className={`stat-item clickable ${filter === 'error' ? 'active' : ''}`}
+                  onClick={() => setFilter('error')}
+                >
                   <span className="stat-label">失败:</span>
                   <span className="stat-value error">{stats.error}</span>
                 </div>
                 {stats.processing > 0 && (
-                  <div className="stat-item">
+                  <div 
+                    className={`stat-item clickable ${filter === 'processing' ? 'active' : ''}`}
+                    onClick={() => setFilter('processing')}
+                  >
                     <span className="stat-label">处理中:</span>
                     <span className="stat-value processing">{stats.processing}</span>
                   </div>
                 )}
                 {stats.pending > 0 && (
-                  <div className="stat-item">
+                  <div 
+                    className={`stat-item clickable ${filter === 'pending' ? 'active' : ''}`}
+                    onClick={() => setFilter('pending')}
+                  >
                     <span className="stat-label">待处理:</span>
                     <span className="stat-value pending">{stats.pending}</span>
                   </div>
@@ -372,13 +396,22 @@ function App() {
                   <div className="accuracy-title">准确率统计</div>
                   <div className="accuracy-value">{accuracy}%</div>
                   <div className="accuracy-details">
-                    <span className="accuracy-detail-item correct">
+                    <span 
+                      className={`accuracy-detail-item correct clickable ${filter === 'correct' ? 'active' : ''}`}
+                      onClick={() => setFilter('correct')}
+                    >
                       正确: {accuracyStats.correct}
                     </span>
-                    <span className="accuracy-detail-item incorrect">
+                    <span 
+                      className={`accuracy-detail-item incorrect clickable ${filter === 'incorrect' ? 'active' : ''}`}
+                      onClick={() => setFilter('incorrect')}
+                    >
                       错误: {accuracyStats.incorrect}
                     </span>
-                    <span className="accuracy-detail-item total">
+                    <span 
+                      className={`accuracy-detail-item total clickable ${filter === 'all' ? 'active' : ''}`}
+                      onClick={() => setFilter('all')}
+                    >
                       总数: {accuracyStats.totalWithAnswer}
                     </span>
                   </div>
@@ -392,10 +425,43 @@ function App() {
               </div>
             )}
 
+            {filter !== 'all' && (
+              <div className="filter-info">
+                <span>当前筛选: </span>
+                <strong>
+                  {filter === 'success' && '成功'}
+                  {filter === 'error' && '失败'}
+                  {filter === 'pending' && '待处理'}
+                  {filter === 'processing' && '处理中'}
+                  {filter === 'correct' && '判断正确'}
+                  {filter === 'incorrect' && '判断错误'}
+                </strong>
+                <span> ({filteredResults.length} 条)</span>
+                <button 
+                  className="btn-clear-filter"
+                  onClick={() => setFilter('all')}
+                >
+                  清除筛选
+                </button>
+              </div>
+            )}
+
             <div className="results-list">
-              {results.map((result, index) => (
-                <ResultItem key={index} result={result} index={index} />
-              ))}
+              {filteredResults.length > 0 ? (
+                filteredResults.map((result, index) => (
+                  <ResultItem key={index} result={result} index={results.indexOf(result)} />
+                ))
+              ) : (
+                <div className="empty-filter">
+                  <div className="empty-filter-text">没有符合筛选条件的结果</div>
+                  <button 
+                    className="btn btn-secondary"
+                    onClick={() => setFilter('all')}
+                  >
+                    查看全部
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         )}
