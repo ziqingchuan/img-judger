@@ -299,32 +299,33 @@ function App() {
   return (
     <div className="app-container">
       <div className="app-header">
-        <h1 className="app-title">📊 Excel图片处理工具</h1>
+        <h1 className="app-title">Excel图片处理工具</h1>
         <p className="app-subtitle">上传Excel文件，自动提取并处理图片链接</p>
       </div>
 
       <div className="main-card">
         <div className="upload-section">
-          <div
-            className={`upload-area ${isDragging ? 'dragging' : ''}`}
-            onDragOver={handleDragOver}
-            onDragLeave={handleDragLeave}
-            onDrop={handleDrop}
-            onClick={() => fileInputRef.current?.click()}
-          >
-            <div className="upload-icon">📁</div>
-            <div className="upload-text">点击或拖拽Excel文件到此处</div>
-            <div className="upload-hint">支持 .xlsx 和 .xls 格式</div>
-            <input
-              ref={fileInputRef}
-              type="file"
-              className="file-input"
-              accept=".xlsx,.xls"
-              onChange={handleFileInputChange}
-            />
-          </div>
-
-          {file && (
+          <input
+            ref={fileInputRef}
+            type="file"
+            className="file-input"
+            accept=".xlsx,.xls"
+            onChange={handleFileInputChange}
+          />
+          
+          {!file ? (
+            <div
+              className={`upload-area ${isDragging ? 'dragging' : ''}`}
+              onDragOver={handleDragOver}
+              onDragLeave={handleDragLeave}
+              onDrop={handleDrop}
+              onClick={() => fileInputRef.current?.click()}
+            >
+              <div className="upload-icon">📁</div>
+              <div className="upload-text">点击或拖拽Excel文件到此处</div>
+              <div className="upload-hint">支持 .xlsx 和 .xls 格式</div>
+            </div>
+          ) : (
             <div className="selected-file">
               <div className="file-info">
                 <span className="file-icon">📄</span>
@@ -332,12 +333,25 @@ function App() {
               </div>
               <div className="button-group">
                 {!isProcessing && results.length === 0 && (
-                  <button
-                    className="btn btn-primary"
-                    onClick={() => processImages(false)}
-                  >
-                    开始处理
-                  </button>
+                  <>
+                    <button
+                      className="btn btn-primary"
+                      onClick={() => processImages(false)}
+                    >
+                      开始处理
+                    </button>
+                    <button
+                      className="btn btn-secondary"
+                      onClick={handleReupload}
+                    >
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M21 15V19C21 19.5304 20.7893 20.0391 20.4142 20.4142C20.0391 20.7893 19.5304 21 19 21H5C4.46957 21 3.96086 20.7893 3.58579 20.4142C3.21071 20.0391 3 19.5304 3 19V15" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                        <path d="M17 8L12 3L7 8" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                        <path d="M12 3V15" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                      </svg>
+                      重新上传
+                    </button>
+                  </>
                 )}
                 {isProcessing && (
                   <button
