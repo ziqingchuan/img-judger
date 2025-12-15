@@ -158,6 +158,19 @@ function App() {
 
   const handleReupload = useCallback(() => {
     if (isProcessing) return; // 处理中禁用，不执行任何操作
+    
+    // 清除localStorage中的所有数据
+    localStorage.removeItem(STORAGE_KEYS.RESULTS);
+    localStorage.removeItem(STORAGE_KEYS.FILE_INFO);
+    localStorage.removeItem(STORAGE_KEYS.FILTER);
+    
+    // 重置所有状态
+    setResults([]);
+    resultsRef.current = [];
+    setFilter('all');
+    setFile(null);
+    
+    // 触发文件选择
     fileInputRef.current?.click();
   }, [isProcessing]);
 
