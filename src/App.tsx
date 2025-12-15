@@ -1,7 +1,8 @@
-import { useState, useRef, memo, useCallback } from 'react';
+import { useState, useRef, memo, useCallback, useEffect } from 'react';
 import './App.css';
 import { parseExcelFile, ImageUrlItem } from './services/excelParser';
 import { cozeGenTotal } from './services/cozeApi';
+import { exportToExcel, exportSummary } from './services/excelExporter';
 
 interface ProcessResult {
   url: string;
@@ -65,19 +66,74 @@ const ResultItem = memo(({ result, index, onImageClick }: { result: ProcessResul
 
 ResultItem.displayName = 'ResultItem';
 
+// 本地存储键名
+const STORAGE_KEYS = {
+  RESULTS: 'excel-processor-results',
+  FILE_INFO: 'excel-processor-file-info',
+  FILTER: 'excel-processor-filter'
+};
+
+// 保存数据到localStorage
+const saveToStorage = (key: string, data: any) => {
+  try {
+    localStorage.setItem(key, JSON.stringify(data));
+  } catch (error) {
+    console.warn('保存数据失败:', error);
+  }
+};
+
+// 从localStorage读取数据
+const loadFromStorage = (key: string, defaultValue: any = null) => {
+  try {
+    const stored = localStorage.getItem(key);
+    return stored ? JSON.parse(stored) : defaultValue;
+  } catch (error) {
+    console.warn('读取数据失败:', error);
+    return defaultValue;
+  }
+};
+
 function App() {
+  // 从localStorage恢复状态
   const [file, setFile] = useState<File | null>(null);
   const [isDragging, setIsDragging] = useState(false);
-  const [results, setResults] = useState<ProcessResult[]>([]);
+  const [results, setResults] = useState<ProcessResult[]>(() => 
+    loadFromStorage(STORAGE_KEYS.RESULTS, [])
+  );
   const [isProcessing, setIsProcessing] = useState(false);
   const [isStopping, setIsStopping] = useState(false);
-  const [filter, setFilter] = useState<'all' | 'success' | 'error' | 'pending' | 'processing' | 'correct' | 'incorrect'>('all');
+  const [filter, setFilter] = useState<'all' | 'success' | 'error' | 'pending' | 'processing' | 'correct' | 'incorrect'>(() => 
+    loadFromStorage(STORAGE_KEYS.FILTER, 'all')
+  );
   const [previewImageUrl, setPreviewImageUrl] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   
   // 优化：使用ref避免状态更新导致的重渲染
   const shouldStopRef = useRef(false);
-  const resultsRef = useRef<ProcessResult[]>([]);
+  const resultsRef = useRef<ProcessResult[]>(loadFromStorage(STORAGE_KEYS.RESULTS, []));
+
+  // 页面加载时恢复文件信息
+  useEffect(() => {
+    const fileInfo = loadFromStorage(STORAGE_KEYS.FILE_INFO);
+    if (fileInfo) {
+      // 创建一个虚拟文件对象用于显示
+      const virtualFile = new File([''], fileInfo.name, { type: fileInfo.type });
+      setFile(virtualFile);
+    }
+  }, []);
+
+  // 监听results变化，自动保存到localStorage
+  useEffect(() => {
+    if (results.length > 0) {
+      saveToStorage(STORAGE_KEYS.RESULTS, results);
+      resultsRef.current = results;
+    }
+  }, [results]);
+
+  // 监听filter变化，自动保存到localStorage
+  useEffect(() => {
+    saveToStorage(STORAGE_KEYS.FILTER, filter);
+  }, [filter]);
 
   const handleFileSelect = (selectedFile: File) => {
     if (selectedFile && selectedFile.name.match(/\.(xlsx|xls)$/i)) {
@@ -85,6 +141,16 @@ function App() {
       setResults([]);
       resultsRef.current = [];
       setFilter('all');
+      
+      // 保存文件信息到localStorage
+      saveToStorage(STORAGE_KEYS.FILE_INFO, {
+        name: selectedFile.name,
+        type: selectedFile.type,
+        size: selectedFile.size
+      });
+      
+      // 清空之前的结果
+      localStorage.removeItem(STORAGE_KEYS.RESULTS);
     } else {
       alert('请选择有效的Excel文件（.xlsx 或 .xls）');
     }
@@ -102,8 +168,40 @@ function App() {
       setResults([]);
       resultsRef.current = [];
       setFilter('all');
+      
+      // 清空localStorage中的结果数据
+      localStorage.removeItem(STORAGE_KEYS.RESULTS);
+      saveToStorage(STORAGE_KEYS.FILTER, 'all');
     }
   }, [isProcessing]);
+
+  const handleExportResults = useCallback(() => {
+    if (results.length === 0) {
+      alert('没有可导出的数据');
+      return;
+    }
+    
+    try {
+      const filename = exportToExcel(results, '图片处理结果');
+      alert(`导出成功！文件名：${filename}`);
+    } catch (error: any) {
+      alert(`导出失败：${error.message}`);
+    }
+  }, [results]);
+
+  const handleExportSummary = useCallback(() => {
+    if (results.length === 0) {
+      alert('没有可导出的数据');
+      return;
+    }
+    
+    try {
+      const filename = exportSummary(results, '处理统计摘要');
+      alert(`导出成功！文件名：${filename}`);
+    } catch (error: any) {
+      alert(`导出失败：${error.message}`);
+    }
+  }, [results]);
 
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
@@ -325,6 +423,18 @@ function App() {
             onChange={handleFileInputChange}
           />
           
+          {results.length > 0 && (
+            <div className="restore-notice">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2"/>
+                <path d="M12 6V12L16 14" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+              <span className="restore-notice-text">
+                已恢复上次的处理结果，共 {results.length} 条数据
+              </span>
+            </div>
+          )}
+          
           {!file ? (
             <div
               className={`upload-area ${isDragging ? 'dragging' : ''}`}
@@ -393,32 +503,65 @@ function App() {
                 <h2 className="results-title">处理结果</h2>
               </div>
               <div className="results-header-right">
-                <button 
-                  className="btn btn-secondary btn-icon"
-                  onClick={handleReupload}
-                  disabled={isProcessing}
-                  title="重新上传文件"
-                >
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M21 15V19C21 19.5304 20.7893 20.0391 20.4142 20.4142C20.0391 20.7893 19.5304 21 19 21H5C4.46957 21 3.96086 20.7893 3.58579 20.4142C3.21071 20.0391 3 19.5304 3 19V15" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                    <path d="M17 8L12 3L7 8" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                    <path d="M12 3V15" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                  </svg>
-                  <span className="btn-text">重新上传</span>
-                </button>
-                <button 
-                  className="btn btn-secondary btn-icon"
-                  onClick={handleRestart}
-                  disabled={isProcessing}
-                  title="重新开始处理"
-                >
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M1 4V10H7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                    <path d="M23 20V14H17" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                    <path d="M20.49 9C19.9828 7.56678 19.1209 6.28536 17.9845 5.27542C16.8482 4.26548 15.4745 3.55976 13.9917 3.22426C12.5089 2.88875 10.9652 2.93434 9.50481 3.35677C8.04437 3.77921 6.71475 4.56471 5.64 5.64L1 10M23 14L18.36 18.36C17.2853 19.4353 15.9556 20.2208 14.4952 20.6432C13.0348 21.0657 11.4911 21.1112 10.0083 20.7757C8.52547 20.4402 7.1518 19.7345 6.01547 18.7246C4.87913 17.7146 4.01717 16.4332 3.51 15" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                  </svg>
-                  <span className="btn-text">重新开始</span>
-                </button>
+                <div className="action-buttons">
+                  <button 
+                    className="btn btn-secondary btn-action"
+                    onClick={handleReupload}
+                    disabled={isProcessing}
+                    title="重新上传文件"
+                  >
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                      <path d="M21 15V19C21 19.5304 20.7893 20.0391 20.4142 20.4142C20.0391 20.7893 19.5304 21 19 21H5C4.46957 21 3.96086 20.7893 3.58579 20.4142C3.21071 20.0391 3 19.5304 3 19V15" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                      <path d="M17 8L12 3L7 8" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                      <path d="M12 3V15" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                    </svg>
+                    <span className="btn-text">重新上传</span>
+                  </button>
+                  <button 
+                    className="btn btn-secondary btn-action"
+                    onClick={handleRestart}
+                    disabled={isProcessing}
+                    title="重新开始处理"
+                  >
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                      <path d="M1 4V10H7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                      <path d="M23 20V14H17" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                      <path d="M20.49 9C19.9828 7.56678 19.1209 6.28536 17.9845 5.27542C16.8482 4.26548 15.4745 3.55976 13.9917 3.22426C12.5089 2.88875 10.9652 2.93434 9.50481 3.35677C8.04437 3.77921 6.71475 4.56471 5.64 5.64L1 10M23 14L18.36 18.36C17.2853 19.4353 15.9556 20.2208 14.4952 20.6432C13.0348 21.0657 11.4911 21.1112 10.0083 20.7757C8.52547 20.4402 7.1518 19.7345 6.01547 18.7246C4.87913 17.7146 4.01717 16.4332 3.51 15" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                    </svg>
+                    <span className="btn-text">重新开始</span>
+                  </button>
+                  {results.length > 0 && (
+                    <>
+                      <button 
+                        className="btn btn-secondary btn-action"
+                        onClick={handleExportResults}
+                        disabled={isProcessing}
+                        title="导出详细结果"
+                      >
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                          <path d="M21 15V19C21 19.5304 20.7893 20.0391 20.4142 20.4142C20.0391 20.7893 19.5304 21 19 21H5C4.46957 21 3.96086 20.7893 3.58579 20.4142C3.21071 20.0391 3 19.5304 3 19V15" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                          <path d="M7 10L12 15L17 10" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                          <path d="M12 15V3" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                        </svg>
+                        <span className="btn-text">导出结果</span>
+                      </button>
+                      <button 
+                        className="btn btn-secondary btn-action"
+                        onClick={handleExportSummary}
+                        disabled={isProcessing}
+                        title="导出统计摘要"
+                      >
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                          <rect x="3" y="3" width="18" height="18" rx="2" ry="2" stroke="currentColor" strokeWidth="2"/>
+                          <path d="M9 9H15" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+                          <path d="M9 12H15" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+                          <path d="M9 15H12" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+                        </svg>
+                        <span className="btn-text">导出摘要</span>
+                      </button>
+                    </>
+                  )}
+                </div>
               </div>
             </div>
             
