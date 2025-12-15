@@ -435,18 +435,7 @@ function App() {
             accept=".xlsx,.xls"
             onChange={handleFileInputChange}
           />
-          
-          {results.length > 0 && (
-            <div className="restore-notice">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2"/>
-                <path d="M12 6V12L16 14" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-              </svg>
-              <span className="restore-notice-text">
-                已恢复上次的处理结果，共 {results.length} 条数据
-              </span>
-            </div>
-          )}
+        
           
           {!file ? (
             <div
