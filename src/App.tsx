@@ -70,7 +70,8 @@ ResultItem.displayName = 'ResultItem';
 const STORAGE_KEYS = {
   RESULTS: 'excel-processor-results',
   FILE_INFO: 'excel-processor-file-info',
-  FILTER: 'excel-processor-filter'
+  FILTER: 'excel-processor-filter',
+  TIMING: 'excel-processor-timing'
 };
 
 // 保存数据到localStorage
@@ -111,6 +112,22 @@ function App() {
   // 优化：使用ref避免状态更新导致的重渲染
   const shouldStopRef = useRef(false);
   const resultsRef = useRef<ProcessResult[]>(loadFromStorage(STORAGE_KEYS.RESULTS, []));
+  
+  // 时间统计
+  const [timingInfo, setTimingInfo] = useState<{ startTime: number | null; endTime: number | null; totalTime: number }>(() => 
+    loadFromStorage(STORAGE_KEYS.TIMING, { startTime: null, endTime: null, totalTime: 0 })
+  );
+  const startTimeRef = useRef<number | null>(null);
+  
+  // 顶部提示
+  const [notification, setNotification] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+  
+  const showNotification = useCallback((message: string, type: 'success' | 'error' = 'success') => {
+    setNotification({ message, type });
+    setTimeout(() => {
+      setNotification(null);
+    }, 2000);
+  }, []);
 
   // 页面加载时恢复文件信息
   useEffect(() => {
@@ -135,6 +152,11 @@ function App() {
     saveToStorage(STORAGE_KEYS.FILTER, filter);
   }, [filter]);
 
+  // 监听timingInfo变化，自动保存到localStorage
+  useEffect(() => {
+    saveToStorage(STORAGE_KEYS.TIMING, timingInfo);
+  }, [timingInfo]);
+
   const handleFileSelect = (selectedFile: File) => {
     if (selectedFile && selectedFile.name.match(/\.(xlsx|xls)$/i)) {
       setFile(selectedFile);
@@ -149,8 +171,10 @@ function App() {
         size: selectedFile.size
       });
       
-      // 清空之前的结果
+      // 清空之前的结果和时间统计
       localStorage.removeItem(STORAGE_KEYS.RESULTS);
+      localStorage.removeItem(STORAGE_KEYS.TIMING);
+      setTimingInfo({ startTime: null, endTime: null, totalTime: 0 });
     } else {
       alert('请选择有效的Excel文件（.xlsx 或 .xls）');
     }
@@ -163,12 +187,14 @@ function App() {
     localStorage.removeItem(STORAGE_KEYS.RESULTS);
     localStorage.removeItem(STORAGE_KEYS.FILE_INFO);
     localStorage.removeItem(STORAGE_KEYS.FILTER);
+    localStorage.removeItem(STORAGE_KEYS.TIMING);
     
     // 重置所有状态
     setResults([]);
     resultsRef.current = [];
     setFilter('all');
     setFile(null);
+    setTimingInfo({ startTime: null, endTime: null, totalTime: 0 });
     
     // 触发文件选择
     fileInputRef.current?.click();
@@ -182,39 +208,41 @@ function App() {
       resultsRef.current = [];
       setFilter('all');
       
-      // 清空localStorage中的结果数据
+      // 清空localStorage中的结果数据和时间统计
       localStorage.removeItem(STORAGE_KEYS.RESULTS);
+      localStorage.removeItem(STORAGE_KEYS.TIMING);
       saveToStorage(STORAGE_KEYS.FILTER, 'all');
+      setTimingInfo({ startTime: null, endTime: null, totalTime: 0 });
     }
   }, [isProcessing]);
 
   const handleExportResults = useCallback(() => {
     if (results.length === 0) {
-      alert('没有可导出的数据');
+      showNotification('没有可导出的数据', 'error');
       return;
     }
     
     try {
       const filename = exportToExcel(results, '图片处理结果');
-      alert(`导出成功！文件名：${filename}`);
+      showNotification(`导出成功！文件名：${filename}`, 'success');
     } catch (error: any) {
-      alert(`导出失败：${error.message}`);
+      showNotification(`导出失败：${error.message}`, 'error');
     }
-  }, [results]);
+  }, [results, showNotification]);
 
   const handleExportSummary = useCallback(() => {
     if (results.length === 0) {
-      alert('没有可导出的数据');
+      showNotification('没有可导出的数据', 'error');
       return;
     }
     
     try {
-      const filename = exportSummary(results, '处理统计摘要');
-      alert(`导出成功！文件名：${filename}`);
+      const filename = exportSummary(results, '处理统计摘要', timingInfo);
+      showNotification(`导出成功！文件名：${filename}`, 'success');
     } catch (error: any) {
-      alert(`导出失败：${error.message}`);
+      showNotification(`导出失败：${error.message}`, 'error');
     }
-  }, [results]);
+  }, [results, timingInfo, showNotification]);
 
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
@@ -246,6 +274,18 @@ function App() {
 
     setIsProcessing(true);
     shouldStopRef.current = false;
+    
+    // 记录开始时间
+    if (!continueFromPending) {
+      startTimeRef.current = Date.now();
+      setTimingInfo((prev: { startTime: number | null; endTime: number | null; totalTime: number }) => ({ 
+        ...prev, 
+        startTime: startTimeRef.current, 
+        endTime: null 
+      }));
+    } else if (startTimeRef.current === null && timingInfo.startTime) {
+      startTimeRef.current = timingInfo.startTime;
+    }
     
     try {
       let imageUrls: ImageUrlItem[];
@@ -366,6 +406,16 @@ function App() {
     } finally {
       setIsProcessing(false);
       setIsStopping(false);
+      
+      // 记录结束时间和总时间
+      if (startTimeRef.current !== null) {
+        const endTime = Date.now();
+        setTimingInfo((prev: { startTime: number | null; endTime: number | null; totalTime: number }) => ({ 
+          ...prev, 
+          endTime, 
+          totalTime: endTime - startTimeRef.current!
+        }));
+      }
     }
   }, [file]);
 
@@ -421,6 +471,18 @@ function App() {
 
   return (
     <div className="app-container">
+      {/* 顶部提示 */}
+      {notification && (
+        <div className={`notification ${notification.type}`}>
+          <div className="notification-content">
+            <span className="notification-icon">
+              {notification.type === 'success' ? '✓' : '✗'}
+            </span>
+            <span className="notification-message">{notification.message}</span>
+          </div>
+        </div>
+      )}
+      
       <div className="app-header">
         <h1 className="app-title">Excel图片处理工具</h1>
         <p className="app-subtitle">上传Excel文件，自动提取并处理图片链接</p>

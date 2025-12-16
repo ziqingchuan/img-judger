@@ -118,7 +118,7 @@ export const exportToExcel = (results: any[], filename: string = '处理结果')
 };
 
 // 导出统计摘要
-export const exportSummary = (results: any[], filename: string = '处理摘要') => {
+export const exportSummary = (results: any[], filename: string = '处理摘要', timingInfo?: { startTime: number | null; endTime: number | null; totalTime: number }) => {
   const stats = {
     总计: results.length,
     成功: results.filter(r => r.status === 'success').length,
@@ -138,6 +138,16 @@ export const exportSummary = (results: any[], filename: string = '处理摘要')
     ? ((accuracyStats.判断正确 / accuracyStats.有标准答案总数) * 100).toFixed(2) + '%'
     : '0.00%';
 
+  // 时间统计
+  const timeStats = {
+    总处理时间: timingInfo?.totalTime ? `${(timingInfo.totalTime / 1000).toFixed(2)}秒` : '未记录',
+    平均每张处理时间: (timingInfo?.totalTime && stats.成功 > 0) 
+      ? `${(timingInfo.totalTime / 1000 / stats.成功).toFixed(2)}秒` 
+      : '未记录',
+    开始时间: timingInfo?.startTime ? new Date(timingInfo.startTime).toLocaleString('zh-CN') : '未记录',
+    结束时间: timingInfo?.endTime ? new Date(timingInfo.endTime).toLocaleString('zh-CN') : '未记录'
+  };
+
   // 创建摘要数据
   const summaryData = [
     { 项目: '处理统计', 数值: '', 说明: '' },
@@ -152,6 +162,12 @@ export const exportSummary = (results: any[], filename: string = '处理摘要')
     { 项目: '有标准答案总数', 数值: accuracyStats.有标准答案总数, 说明: '包含标准答案的数据条数' },
     { 项目: '判断正确', 数值: accuracyStats.判断正确, 说明: '与标准答案一致的条数' },
     { 项目: '判断错误', 数值: accuracyStats.判断错误, 说明: '与标准答案不一致的条数' },
+    { 项目: '', 数值: '', 说明: '' },
+    { 项目: '时间统计', 数值: '', 说明: '' },
+    { 项目: '总处理时间', 数值: timeStats.总处理时间, 说明: '从开始到结束的总时间' },
+    { 项目: '平均每张处理时间', 数值: timeStats.平均每张处理时间, 说明: '成功处理的图片平均用时' },
+    { 项目: '开始时间', 数值: timeStats.开始时间, 说明: '处理开始的时间' },
+    { 项目: '结束时间', 数值: timeStats.结束时间, 说明: '处理结束的时间' },
   ];
 
   // 创建工作簿
