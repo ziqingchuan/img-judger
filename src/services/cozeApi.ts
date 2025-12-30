@@ -1,5 +1,5 @@
 const COZE_API_WORKFLOW = 'https://api.coze.cn/v1/workflow/run';
-const COZE_AUTH_TOKEN = 'pat_szyWIHrNbn6EgpGJzgz80svFmq3GLtqb7PBKBzYcJLCUrJRu5jYwyWfa2v0ii86R';
+const COZE_AUTH_TOKEN = 'pat_VfbV3r9a77ajA6cBDlqc0XUM6Tqzrh6GiHoOkL8DVX7UQKN1SPRRev3jtwvjgCub';
 const COZE_WORKFLOW_ID = '7577583987406471187';
 
 export const cozeGenTotal = async (url: string): Promise<any> => {
