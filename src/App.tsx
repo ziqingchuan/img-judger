@@ -4,6 +4,65 @@ import { parseExcelFile, ImageUrlItem } from './services/excelParser';
 import { cozeGenTotal } from './services/cozeApi';
 import { exportToExcel, exportSummary } from './services/excelExporter';
 
+// 格式化 Coze API 错误信息
+const formatCozeApiError = (error: any): string => {
+  if (!error) return '未知错误';
+  
+  // 如果是结构化的错误对象
+  if (error.type && error.message) {
+    const parts = [error.message];
+    
+    // 根据错误类型添加详细信息
+    if (error.type === 'api' && error.statusCode) {
+      parts.push(`  状态码: ${error.statusCode}`);
+      if (error.url) {
+        parts.push(`  请求URL: ${error.url}`);
+      }
+      if (error.responseText) {
+        parts.push(`  响应内容: ${error.responseText.substring(0, 200)}${error.responseText.length > 200 ? '...' : ''}`);
+      }
+      if (error.response && typeof error.response === 'object') {
+        const errorDetails = JSON.stringify(error.response, null, 2);
+        if (errorDetails !== '{}') {
+          parts.push(`  错误详情: ${errorDetails}`);
+        }
+      }
+    } else if (error.type === 'network') {
+      if (error.url) {
+        parts.push(`  请求URL: ${error.url}`);
+      }
+      if (error.originalError && error.originalError.message) {
+        parts.push(`  原始错误: ${error.originalError.message}`);
+      }
+    } else if (error.type === 'parse') {
+      if (error.url) {
+        parts.push(`  请求URL: ${error.url}`);
+      }
+      if (error.data) {
+        parts.push(`  解析失败的data: ${error.data.substring(0, 100)}${error.data.length > 100 ? '...' : ''}`);
+      }
+      if (error.responseText) {
+        parts.push(`  响应文本: ${error.responseText.substring(0, 200)}${error.responseText.length > 200 ? '...' : ''}`);
+      }
+    } else if (error.type === 'data') {
+      if (error.url) {
+        parts.push(`  请求URL: ${error.url}`);
+      }
+      if (error.parsedData) {
+        parts.push(`  解析后的数据: ${JSON.stringify(error.parsedData, null, 2).substring(0, 200)}${JSON.stringify(error.parsedData).length > 200 ? '...' : ''}`);
+      }
+      if (error.result) {
+        parts.push(`  原始结果: ${JSON.stringify(error.result, null, 2)}`);
+      }
+    }
+    
+    return parts.join('\n');
+  }
+  
+  // 普通错误
+  return error.message || String(error);
+};
+
 interface ProcessResult {
   url: string;
   rowIndex: number;
@@ -34,8 +93,8 @@ const ResultItem = memo(({ result, index, onImageClick }: { result: ProcessResul
               处理中
             </>
           )}
-          {result.status === 'success' && '✓ 成功'}
-          {result.status === 'error' && '✗ 失败'}
+          {result.status === 'success' && '成功'}
+          {result.status === 'error' && '失败'}
         </div>
       </div>
       
@@ -47,8 +106,8 @@ const ResultItem = memo(({ result, index, onImageClick }: { result: ProcessResul
               : (typeof result.result === 'string' ? result.result : JSON.stringify(result.result, null, 2))}
           </div>
           {result.correctAnswer !== undefined && (
-            <div style={{ marginTop: '8px', fontSize: '13px', color: result.isCorrect ? '#67c23a' : '#f56c6c', fontWeight: 'bold' }}>
-              {result.isCorrect ? '✓ 判断正确' : '✗ 判断错误'} 
+            <div style={{ marginTop: '8px', fontSize: '13px', color: result.isCorrect ? '#52c41a' : '#ff4d4f', fontWeight: 'bold' }}>
+              {result.isCorrect ? '判断正确' : '判断错误'} 
               (标准答案: {result.correctAnswer === 1 ? '合格' : '不合格'})
             </div>
           )}
@@ -101,16 +160,21 @@ function App() {
   const [results, setResults] = useState<ProcessResult[]>(() => 
     loadFromStorage(STORAGE_KEYS.RESULTS, [])
   );
-  const [isProcessing, setIsProcessing] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(() => 
+    loadFromStorage('excel-processor-is-processing', false)
+  );
   const [isStopping, setIsStopping] = useState(false);
   const [filter, setFilter] = useState<'all' | 'success' | 'error' | 'pending' | 'processing' | 'correct' | 'incorrect'>(() => 
     loadFromStorage(STORAGE_KEYS.FILTER, 'all')
   );
   const [previewImageUrl, setPreviewImageUrl] = useState<string | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize] = useState(10);
   const fileInputRef = useRef<HTMLInputElement>(null);
   
   // 优化：使用ref避免状态更新导致的重渲染
   const shouldStopRef = useRef(false);
+  const abortControllerRef = useRef<AbortController | null>(null);
   const resultsRef = useRef<ProcessResult[]>(loadFromStorage(STORAGE_KEYS.RESULTS, []));
   
   // 时间统计
@@ -129,7 +193,7 @@ function App() {
     }, 2000);
   }, []);
 
-  // 页面加载时恢复文件信息
+  // 页面加载时恢复文件信息和处理状态
   useEffect(() => {
     const fileInfo = loadFromStorage(STORAGE_KEYS.FILE_INFO);
     if (fileInfo) {
@@ -137,7 +201,45 @@ function App() {
       const virtualFile = new File([''], fileInfo.name, { type: fileInfo.type });
       setFile(virtualFile);
     }
+    
+    // 检查是否有正在处理的项目，如果有，将它们恢复为待处理状态
+    // 因为页面刷新后，之前的处理进程已经被中断
+    if (results.length > 0) {
+      const hasProcessingItems = results.some(r => r.status === 'processing');
+      if (hasProcessingItems) {
+        const updatedResults: ProcessResult[] = results.map(r => 
+          r.status === 'processing' ? { ...r, status: 'pending' as const } : r
+        );
+        setResults(updatedResults);
+        resultsRef.current = updatedResults;
+        saveToStorage(STORAGE_KEYS.RESULTS, updatedResults);
+        setIsProcessing(false);
+        saveToStorage('excel-processor-is-processing', false);
+      }
+    }
   }, []);
+
+  // 监听浏览器关闭或刷新事件
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      // 只有在处理过程中或有未完成的项目时才显示确认弹窗
+      if (isProcessing || results.some(r => r.status === 'pending' || r.status === 'processing')) {
+        // 取消默认行为
+        e.preventDefault();
+        // 现代浏览器只需要调用preventDefault()
+        // 不同浏览器对返回值的处理方式不同，但都会显示确认弹窗
+        return '';
+      }
+    };
+
+    // 添加事件监听器
+    window.addEventListener('beforeunload', handleBeforeUnload);
+
+    // 清理函数
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+    };
+  }, [isProcessing, results]);
 
   // 监听results变化，自动保存到localStorage
   useEffect(() => {
@@ -147,15 +249,21 @@ function App() {
     }
   }, [results]);
 
-  // 监听filter变化，自动保存到localStorage
+  // 监听filter变化，自动保存到localStorage并重置页码
   useEffect(() => {
     saveToStorage(STORAGE_KEYS.FILTER, filter);
+    setCurrentPage(1);
   }, [filter]);
 
   // 监听timingInfo变化，自动保存到localStorage
   useEffect(() => {
     saveToStorage(STORAGE_KEYS.TIMING, timingInfo);
   }, [timingInfo]);
+
+  // 监听isProcessing变化，自动保存到localStorage
+  useEffect(() => {
+    saveToStorage('excel-processor-is-processing', isProcessing);
+  }, [isProcessing]);
 
   const handleFileSelect = (selectedFile: File) => {
     if (selectedFile && selectedFile.name.match(/\.(xlsx|xls)$/i)) {
@@ -275,6 +383,9 @@ function App() {
     setIsProcessing(true);
     shouldStopRef.current = false;
     
+    // 创建新的AbortController用于中断API调用
+    abortControllerRef.current = new AbortController();
+    
     // 记录开始时间
     if (!continueFromPending) {
       startTimeRef.current = Date.now();
@@ -324,10 +435,6 @@ function App() {
         setResults([...initialResults]);
       }
 
-      // 优化：批量更新，减少渲染次数（每10个更新一次）
-      const BATCH_SIZE = 10;
-      let batchCount = 0;
-
       // 顺序处理每个图片链接
       for (let i = startIndex; i < imageUrls.length; i++) {
         // 检查是否需要停止
@@ -341,18 +448,12 @@ function App() {
 
         const item = imageUrls[i];
         
-        // 更新状态为处理中
+        // 更新状态为处理中 - 实时更新UI
         resultsRef.current[i] = { ...resultsRef.current[i], status: 'processing' };
-        batchCount++;
-        
-        // 批量更新UI
-        if (batchCount >= BATCH_SIZE) {
-          setResults([...resultsRef.current]);
-          batchCount = 0;
-        }
+        setResults([...resultsRef.current]);
 
         try {
-          const result = await cozeGenTotal(item.url);
+          const result = await cozeGenTotal(item.url, abortControllerRef.current?.signal);
           
           // 再次检查是否需要停止
           if (shouldStopRef.current) {
@@ -378,32 +479,28 @@ function App() {
             isCorrect = predictedQualified === expectedQualified;
           }
           
-          // 更新状态为成功
+          // 更新状态为成功 - 实时更新UI
           resultsRef.current[i] = { 
             ...resultsRef.current[i], 
             status: 'success', 
             result,
             isCorrect 
           };
-        } catch (error: any) {
-          // 更新状态为失败
-          resultsRef.current[i] = { ...resultsRef.current[i], status: 'error', error: error.message };
-        }
-        
-        batchCount++;
-        
-        // 批量更新UI
-        if (batchCount >= BATCH_SIZE) {
           setResults([...resultsRef.current]);
-          batchCount = 0;
+        } catch (error: any) {
+          // 更新状态为失败 - 实时更新UI
+          resultsRef.current[i] = { ...resultsRef.current[i], status: 'error', error: formatCozeApiError(error) };
+          setResults([...resultsRef.current]);
         }
       }
-      
-      // 最后更新一次确保所有状态同步
-      setResults([...resultsRef.current]);
     } catch (error: any) {
-      alert(`处理失败: ${error.message}`);
+      // 忽略中止错误，因为这是用户主动停止的
+      if (error.name !== 'AbortError') {
+        alert(`处理失败: ${error.message}`);
+      }
     } finally {
+      // 清理AbortController
+      abortControllerRef.current = null;
       setIsProcessing(false);
       setIsStopping(false);
       
@@ -422,6 +519,12 @@ function App() {
   const handleStop = useCallback(() => {
     setIsStopping(true);
     shouldStopRef.current = true;
+    
+    // 中断正在进行的API调用
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      console.log('已中断API调用');
+    }
     
     // 监听处理状态变化，当停止后隐藏加载提示
     const checkStopped = setInterval(() => {
@@ -455,10 +558,6 @@ function App() {
     ? ((accuracyStats.correct / accuracyStats.totalWithAnswer) * 100).toFixed(2)
     : '0.00';
 
-  const progress = stats.total > 0 
-    ? ((stats.success + stats.error) / stats.total) * 100 
-    : 0;
-
   const hasPendingItems = stats.pending > 0;
 
   // 过滤结果
@@ -469,26 +568,49 @@ function App() {
     return result.status === filter;
   });
 
+  // 分页相关计算
+  const totalPages = Math.ceil(filteredResults.length / pageSize);
+  const startIndex = (currentPage - 1) * pageSize;
+  const endIndex = startIndex + pageSize;
+  const currentPageResults = filteredResults.slice(startIndex, endIndex);
+  
+  // 处理分页变化
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page);
+  };
+
+  const progress = stats.total > 0 
+    ? ((stats.success + stats.error) / stats.total) * 100 
+    : 0;
+
   return (
     <div className="app-container">
       {/* 顶部提示 */}
       {notification && (
         <div className={`notification ${notification.type}`}>
           <div className="notification-content">
-            <span className="notification-icon">
-              {notification.type === 'success' ? '✓' : '✗'}
-            </span>
-            <span className="notification-message">{notification.message}</span>
-          </div>
+          <span className="notification-icon">
+            {notification.type === 'success' ? (
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                <path d="M8 1L15 8L8 15L1 8L8 1Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+            ) : (
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                <path d="M14 2L2 14" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+                <path d="M2 2L14 14" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+              </svg>
+            )}
+          </span>
+          <span className="notification-message">{notification.message}</span>
+        </div>
         </div>
       )}
       
       <div className="app-header">
-        <h1 className="app-title">Excel图片处理工具</h1>
-        <p className="app-subtitle">上传Excel文件，自动提取并处理图片链接</p>
+        <h1 className="app-title">AI审核图片工具</h1>
       </div>
 
-      <div className="main-card">
+      <div className="main-content">
         <div className="upload-section">
           <input
             ref={fileInputRef}
@@ -507,14 +629,23 @@ function App() {
               onDrop={handleDrop}
               onClick={() => fileInputRef.current?.click()}
             >
-              <div className="upload-icon">📁</div>
+              <div className="upload-icon">
+            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
+            </svg>
+          </div>
               <div className="upload-text">点击或拖拽Excel文件到此处</div>
               <div className="upload-hint">支持 .xlsx 和 .xls 格式</div>
             </div>
           ) : (
             <div className="selected-file">
               <div className="file-info">
-                <span className="file-icon">📄</span>
+                <span className="file-icon">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/>
+                    <polyline points="14 2 14 8 20 8"/>
+                  </svg>
+                </span>
                 <span className="file-name">{file.name}</span>
               </div>
               <div className="button-group">
@@ -730,10 +861,10 @@ function App() {
             )}
 
             <div className="results-list">
-              {filteredResults.length > 0 ? (
-                filteredResults.map((result, index) => (
+              {currentPageResults.length > 0 ? (
+                currentPageResults.map((result) => (
                   <ResultItem 
-                    key={index} 
+                    key={results.indexOf(result)} 
                     result={result} 
                     index={results.indexOf(result)} 
                     onImageClick={setPreviewImageUrl}
@@ -751,12 +882,61 @@ function App() {
                 </div>
               )}
             </div>
+            
+            {/* 分页控件 */}
+            {totalPages > 1 && (
+              <div className="pagination">
+                <button 
+                  className="btn btn-secondary pagination-btn"
+                  onClick={() => handlePageChange(1)}
+                  disabled={currentPage === 1}
+                >
+                  首页
+                </button>
+                <button 
+                  className="btn btn-secondary pagination-btn"
+                  onClick={() => handlePageChange(currentPage - 1)}
+                  disabled={currentPage === 1}
+                >
+                  上一页
+                </button>
+                
+                {/* 页码按钮 */}
+                {Array.from({ length: totalPages }, (_, i) => i + 1).map(page => (
+                  <button 
+                    key={page}
+                    className={`btn pagination-btn ${currentPage === page ? 'active' : ''}`}
+                    onClick={() => handlePageChange(page)}
+                  >
+                    {page}
+                  </button>
+                ))}
+                
+                <button 
+                  className="btn btn-secondary pagination-btn"
+                  onClick={() => handlePageChange(currentPage + 1)}
+                  disabled={currentPage === totalPages}
+                >
+                  下一页
+                </button>
+                <button 
+                  className="btn btn-secondary pagination-btn"
+                  onClick={() => handlePageChange(totalPages)}
+                  disabled={currentPage === totalPages}
+                >
+                  末页
+                </button>
+                
+                <div className="pagination-info">
+                  第 {currentPage} / {totalPages} 页
+                </div>
+              </div>
+            )}
           </div>
         )}
 
         {results.length === 0 && file && !isProcessing && (
           <div className="empty-state">
-            <div className="empty-icon">📋</div>
             <div className="empty-text">点击"开始处理"按钮来处理Excel中的图片链接</div>
           </div>
         )}
