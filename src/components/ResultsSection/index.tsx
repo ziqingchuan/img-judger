@@ -55,9 +55,9 @@ const ResultsSection: React.FC<ResultsSectionProps> = ({
   // 过滤结果
   const filteredResults = results.filter(result => {
     if (filter === 'all') return true;
-    if (filter === 'correct') return result.isCorrect === true;
+    if (filter === 'error') return result.status === 'error';
     if (filter === 'incorrect') return result.isCorrect === false;
-    return result.status === filter;
+    return false;
   });
 
   // 分页相关计算
@@ -135,74 +135,30 @@ const ResultsSection: React.FC<ResultsSectionProps> = ({
         </div>
       </div>
       
-      <div className="results-stats-row">
-        <div className="results-stats">
-          <div 
-            className={`stat-item clickable ${filter === 'all' ? 'active' : ''}`}
-            onClick={() => setFilter('all')}
-          >
-            <span className="stat-label">总计:</span>
-            <span className="stat-value">{stats.total}</span>
-          </div>
-          <div 
-            className={`stat-item clickable ${filter === 'success' ? 'active' : ''}`}
-            onClick={() => setFilter('success')}
-          >
-            <span className="stat-label">成功:</span>
-            <span className="stat-value success">{stats.success}</span>
-          </div>
-          <div 
-            className={`stat-item clickable ${filter === 'error' ? 'active' : ''}`}
-            onClick={() => setFilter('error')}
-          >
-            <span className="stat-label">失败:</span>
-            <span className="stat-value error">{stats.error}</span>
-          </div>
-          {stats.processing > 0 && (
-            <div 
-              className={`stat-item clickable ${filter === 'processing' ? 'active' : ''}`}
-              onClick={() => setFilter('processing')}
-            >
-              <span className="stat-label">处理中:</span>
-              <span className="stat-value processing">{stats.processing}</span>
-            </div>
-          )}
-          {stats.pending > 0 && (
-            <div 
-              className={`stat-item clickable ${filter === 'pending' ? 'active' : ''}`}
-              onClick={() => setFilter('pending')}
-            >
-              <span className="stat-label">待处理:</span>
-              <span className="stat-value pending">{stats.pending}</span>
-            </div>
-          )}
-        </div>
-      </div>
-
       {accuracyStats.totalWithAnswer > 0 && (
         <div className="accuracy-section">
           <div className="accuracy-card">
             <div className="accuracy-title">准确率统计</div>
             <div className="accuracy-value">{accuracy}%</div>
-            <div className="accuracy-details">
-              <span 
-                className={`accuracy-detail-item correct clickable ${filter === 'correct' ? 'active' : ''}`}
-                onClick={() => setFilter('correct')}
-              >
-                正确: {accuracyStats.correct}
-              </span>
-              <span 
-                className={`accuracy-detail-item incorrect clickable ${filter === 'incorrect' ? 'active' : ''}`}
-                onClick={() => setFilter('incorrect')}
-              >
-                错误: {accuracyStats.incorrect}
-              </span>
-              <span 
-                className={`accuracy-detail-item total clickable ${filter === 'all' ? 'active' : ''}`}
+            <div className="accuracy-buttons">
+              <button 
+                className={`accuracy-btn ${filter === 'all' ? 'active' : ''}`}
                 onClick={() => setFilter('all')}
               >
-                总数: {accuracyStats.totalWithAnswer}
-              </span>
+                全部数据: {stats.total}
+              </button>
+              <button 
+                className={`accuracy-btn ${filter === 'error' ? 'active' : ''}`}
+                onClick={() => setFilter('error')}
+              >
+                处理失败: {stats.error}
+              </button>
+              <button 
+                className={`accuracy-btn ${filter === 'incorrect' ? 'active' : ''}`}
+                onClick={() => setFilter('incorrect')}
+              >
+                判断错误: {accuracyStats.incorrect}
+              </button>
             </div>
           </div>
         </div>
@@ -218,11 +174,7 @@ const ResultsSection: React.FC<ResultsSectionProps> = ({
         <div className="filter-info">
           <span>当前筛选: </span>
           <strong>
-            {filter === 'success' && '成功'}
-            {filter === 'error' && '失败'}
-            {filter === 'pending' && '待处理'}
-            {filter === 'processing' && '处理中'}
-            {filter === 'correct' && '判断正确'}
+            {filter === 'error' && '处理失败'}
             {filter === 'incorrect' && '判断错误'}
           </strong>
           <span> ({filteredResults.length} 条)</span>

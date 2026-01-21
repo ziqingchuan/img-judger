@@ -1,5 +1,5 @@
 .result-item {
-  border: 2px solid #e8e8e8;
+  border: none;
   border-radius: 12px;
   padding: 16px;
   transition: all 0.3s ease;
@@ -8,19 +8,19 @@
 
 
 .result-item.success {
-  border-left: 2px solid #52c41a;
+  box-shadow: 1px 1px 5px #52c41a;
 }
 
 .result-item.error {
-  border-left: 2px solid #ff4d4f;
+  box-shadow: 1px 1px 5px #ff4d4f;
 }
 
 .result-item.processing {
-  border-left: 2px solid #1890ff;
+  box-shadow: 1px 1px 5px #1890ff;
 }
 
 .result-item.pending {
-  border-left: 2px solid #faad14;
+  box-shadow: 1px 1px 5px #faad14;
 }
 
 .result-header {

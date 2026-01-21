@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+import React, { useState } from 'react';
 import './styles.css'
 interface UploadSectionProps {
   file: File | null;
@@ -9,6 +9,7 @@ interface UploadSectionProps {
   onReupload: () => void;
   onStop: () => void;
   onContinue: () => void;
+  fileInputRef: React.RefObject<HTMLInputElement>;
 }
 
 const UploadSection: React.FC<UploadSectionProps> = ({
@@ -19,10 +20,10 @@ const UploadSection: React.FC<UploadSectionProps> = ({
   onProcessImages,
   onReupload,
   onStop,
-  onContinue
+  onContinue,
+  fileInputRef
 }) => {
   const [isDragging, setIsDragging] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();

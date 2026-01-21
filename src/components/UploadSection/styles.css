@@ -139,15 +139,16 @@
 .btn-secondary:hover:not(:disabled) {
   color: #1890ff;
   border-color: #1890ff;
+  background: #e6f7ff;
 }
 
 .btn-success {
-  background: #1d60db;
+  background: #1890ff;
   color: white;
 }
 
 .btn-success:hover:not(:disabled) {
-  background: #1445a1;
+  background: #0563bb;
 }
 
 .btn-danger {

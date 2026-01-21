@@ -162,6 +162,11 @@ function App() {
     setFile(null);
     setTimingInfo({ startTime: null, endTime: null, totalTime: 0 });
     
+    // 重置文件输入框的值，确保可以重新选择同一个文件
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+    
     // 触发文件选择
     fileInputRef.current?.click();
   }, [isProcessing]);
@@ -388,20 +393,22 @@ function App() {
       )}
       
       <div className="app-header">
-        <h1 className="app-title">AI审核图片工具</h1>
+        <img src='img-judge.svg' />
+        <h1 className="app-title">图片审核工具</h1>
       </div>
 
       <div className="main-content">
-        <UploadSection 
-          file={file}
-          isProcessing={isProcessing}
-          resultsLength={results.length}
-          onFileSelect={handleFileSelect}
-          onProcessImages={processImages}
-          onReupload={handleReupload}
-          onStop={handleStop}
-          onContinue={handleContinue}
-        />
+      <UploadSection 
+        file={file}
+        isProcessing={isProcessing}
+        resultsLength={results.length}
+        onFileSelect={handleFileSelect}
+        onProcessImages={processImages}
+        onReupload={handleReupload}
+        onStop={handleStop}
+        onContinue={handleContinue}
+        fileInputRef={fileInputRef}
+      />
 
         {results.length > 0 && (
           <ResultsSection 

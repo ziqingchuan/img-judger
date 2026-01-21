@@ -57,69 +57,11 @@
   }
 }
 
-.results-stats-row {
-  margin-bottom: 24px;
-}
+/* 已移除results-stats-row样式 */
 
-.results-stats {
-  display: flex;
-  gap: 24px;
-  flex-wrap: wrap;
-}
+/* 已移除results-stats样式 */
 
-.stat-item {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  width: 100px;
-  padding: 8px;
-  background: #fafafa;
-  border-radius: 6px;
-  border: 1px solid #cfcfcf;
-  transition: all 0.3s ease;
-}
-
-.stat-item.clickable {
-  cursor: pointer;
-}
-
-.stat-item.clickable:hover {
-  background: #f0f8ff;
-  border-color: #91d5ff;
-}
-
-.stat-item.active {
-  background: #e6f7ff;
-  border-color: #1890ff;
-}
-
-.stat-label {
-  font-size: 14px;
-  color: #666;
-}
-
-.stat-value {
-  font-size: 16px;
-  font-weight: 600;
-  color: #333;
-}
-
-.stat-value.success {
-  color: #52c41a;
-}
-
-.stat-value.error {
-  color: #ff4d4f;
-}
-
-.stat-value.processing {
-  color: #1890ff;
-}
-
-.stat-value.pending {
-  color: #faad14;
-}
+/* 已移除stat-item相关样式 */
 
 .accuracy-section {
   margin-bottom: 24px;
@@ -147,53 +89,37 @@
   margin-bottom: 12px;
 }
 
-.accuracy-details {
+.accuracy-buttons {
   display: flex;
   justify-content: center;
-  gap: 24px;
+  gap: 16px;
   flex-wrap: wrap;
+  margin-top: 16px;
 }
 
-.accuracy-detail-item {
-  font-size: 14px;
-  padding: 6px 12px;
+.accuracy-btn {
+  padding: 8px 12px;
+  border: 1px solid #d9d9d9;
   border-radius: 8px;
-  border: 1px solid #e8e8e8;
-  transition: all 0.3s ease;
-}
-
-.accuracy-detail-item.clickable {
+  background: white;
+  color: #666;
+  font-size: 14px;
   cursor: pointer;
+  transition: all 0.3s ease;
+  min-width: 100px;
 }
 
-.accuracy-detail-item.correct {
-  color: #52c41a;
-  background: rgba(82, 196, 26, 0.1);
+.accuracy-btn:hover {
+  border-color: #1890ff;
+  color: #1890ff;
+  background: #f0f8ff;
 }
 
-.accuracy-detail-item.correct.clickable:hover,
-.accuracy-detail-item.correct.active {
-  background: rgba(82, 196, 26, 0.2);
-}
-
-.accuracy-detail-item.incorrect {
-  color: #ff4d4f;
-  background: rgba(255, 77, 79, 0.1);
-}
-
-.accuracy-detail-item.incorrect.clickable:hover,
-.accuracy-detail-item.incorrect.active {
-  background: rgba(255, 77, 79, 0.2);
-}
-
-.accuracy-detail-item.total {
-  color: #218cf0;
-  background: rgba(107, 156, 199, 0.1);
-}
-
-.accuracy-detail-item.total.clickable:hover,
-.accuracy-detail-item.total.active {
-  background: rgba(24, 144, 255, 0.2);
+.accuracy-btn.active {
+  background: #1890ff;
+  border-color: #1890ff;
+  color: white;
+  font-weight: 500;
 }
 
 .progress-bar {
@@ -246,32 +172,7 @@
   gap: 24px;
 }
 
-.empty-state {
-  text-align: center;
-  padding: 60px 20px;
-}
-
-.empty-icon {
-  font-size: 64px;
-  margin-bottom: 16px;
-  opacity: 0.5;
-}
-
-.empty-text {
-  font-size: 14px;
-  color: #8c8c8c;
-}
-
-.empty-filter {
-  text-align: center;
-  padding: 40px 20px;
-}
-
-.empty-filter-text {
-  font-size: 14px;
-  color: #8c8c8c;
-  margin-bottom: 16px;
-}
+/* 已移除empty相关样式 */
 
 .pagination {
   display: flex;
@@ -338,19 +239,9 @@
     justify-content: center;
   }
 
-  .results-stats {
-    gap: 12px;
-  }
+/* 已移除results-stats和stat-item相关响应式样式 */
 
-  .stat-item {
-    flex: 1;
-    min-width: calc(50% - 6px);
-    justify-content: center;
-  }
-
-  .accuracy-details {
-    gap: 12px;
-  }
+/* 已移除accuracy-details相关响应式样式 */
 
   .pagination {
     gap: 6px;
@@ -373,8 +264,4 @@
   }
 }
 
-@media (max-width: 480px) {
-  .stat-item {
-    min-width: 100%;
-  }
-}
+/* 已移除stat-item相关响应式样式 */
